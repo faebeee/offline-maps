@@ -21,6 +21,9 @@ coverage/
 /data/regions/
 # local registry of what this machine has downloaded
 /data/regions.json
+# sqlite database holding points of interest (-wal / -shm are WAL sidecars)
+/data/offline-maps.db
+/data/offline-maps.db-*
 # 554-entry Geofabrik catalog — `npm run setup`
 /data/geofabrik-index.json
 

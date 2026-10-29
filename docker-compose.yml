@@ -7,6 +7,9 @@ services:
     environment:
       # extra origins allowed to call /api, e.g. http://maps.local:8080
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # unset -> sqlite at data/offline-maps.db; set to move POIs to Postgres,
+      # e.g. postgres://maps:secret@db:5432/maps
+      DATABASE_URL: ${DATABASE_URL:-}
     volumes:
       - ./data:/app/data
       - ./assets:/app/assets

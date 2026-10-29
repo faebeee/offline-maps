@@ -1,17 +1,43 @@
 import type {
+  Bbox,
   CreateDownloadRequest,
+  CreatePoiRequest,
   Job,
   JobsResponse,
   PlaceCandidate,
   PlacesResponse,
+  Poi,
+  PoisResponse,
   Region,
   RegionsResponse,
   Status,
   Theme,
+  UpdatePoiRequest,
 } from "@offline-maps/shared";
 
-export type { Bbox, Job, PlaceCandidate, Polygon, Region, Status, Theme } from "@offline-maps/shared";
-export { DEFAULT_MAXZOOM, isJobFinished, isTheme, MAX_ZOOM, THEMES } from "@offline-maps/shared";
+export type {
+  Bbox,
+  CreatePoiRequest,
+  Job,
+  PlaceCandidate,
+  Poi,
+  Polygon,
+  Region,
+  Status,
+  Theme,
+  UpdatePoiRequest,
+} from "@offline-maps/shared";
+export {
+  DEFAULT_MAXZOOM,
+  DEFAULT_POI_EMOJI,
+  isJobFinished,
+  isTheme,
+  MAX_ZOOM,
+  POI_EMOJI_MAX,
+  POI_EMOJI_PRESETS,
+  POI_NAME_MAX,
+  THEMES,
+} from "@offline-maps/shared";
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -63,8 +89,32 @@ export function deleteRegion(name: string): Promise<void> {
   return request<void>(`/api/regions/${encodeURIComponent(name)}`, { method: "DELETE" });
 }
 
-export function styleUrl(region: Region, theme: Theme): string {
-  return `/api/styles/${region.name}.json?theme=${theme}`;
+/** Style that renders every downloaded region at once. */
+export function allStyleUrl(theme: Theme): string {
+  return `/api/styles/_all.json?theme=${theme}`;
+}
+
+/** Smallest box containing every region, for framing the map on first load. */
+export function unionBbox(regions: Region[]): Bbox | undefined {
+  const [first, ...rest] = regions;
+  if (!first) return undefined;
+  return rest.reduce<Bbox>(
+    (acc, r) => [
+      Math.min(acc[0], r.bbox[0]),
+      Math.min(acc[1], r.bbox[1]),
+      Math.max(acc[2], r.bbox[2]),
+      Math.max(acc[3], r.bbox[3]),
+    ],
+    [...first.bbox],
+  );
+}
+
+/**
+ * Identity of the region set, so effects re-run when a region is added,
+ * removed or rebuilt — but not on every refresh that returns the same list.
+ */
+export function regionsKey(regions: Region[]): string {
+  return regions.map((r) => `${r.name}@${r.build}`).join(",");
 }
 
 // ------------------------------------------------------------- status ---
@@ -85,6 +135,29 @@ export async function searchPlaces(query: string, signal?: AbortSignal): Promise
     { signal },
   );
   return data.places;
+}
+
+// --------------------------------------------------------------- pois ---
+
+export async function fetchPois(bbox?: Bbox): Promise<Poi[]> {
+  const query = bbox ? `?bbox=${bbox.join(",")}` : "";
+  const data = await request<PoisResponse>(`/api/pois${query}`);
+  return data.pois;
+}
+
+export function createPoi(body: CreatePoiRequest): Promise<Poi> {
+  return request<Poi>("/api/pois", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updatePoi(id: string, body: UpdatePoiRequest): Promise<Poi> {
+  return request<Poi>(`/api/pois/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deletePoi(id: string): Promise<void> {
+  return request<void>(`/api/pois/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 // --------------------------------------------------------------- jobs ---

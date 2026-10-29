@@ -15,6 +15,8 @@ export const PATHS = {
   data: path.join(ROOT, "data"),
   regionsDir: path.join(ROOT, "data", "regions"),
   registry: path.join(ROOT, "data", "regions.json"),
+  /** sqlite file holding user data (points of interest) */
+  db: path.join(ROOT, "data", "offline-maps.db"),
   geofabrikIndex: path.join(ROOT, "data", "geofabrik-index.json"),
   assets: path.join(ROOT, "assets"),
   fonts: path.join(ROOT, "assets", "fonts"),

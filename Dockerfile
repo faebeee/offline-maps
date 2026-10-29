@@ -5,7 +5,11 @@ WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/ packages/
 COPY apps/ apps/
-RUN npm ci
+# better-sqlite3 ships a binding.gyp, and npm's default for that is `node-gyp
+# rebuild` even though the package has no install script. This image has no
+# compiler, and it does not need one: the package bundles N-API prebuilds, and
+# this stage only runs tsc and vite. It is the only package here with scripts.
+RUN npm ci --ignore-scripts
 # builds @offline-maps/shared, then the backend and the viewer
 RUN npm run build
 

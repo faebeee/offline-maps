@@ -3,6 +3,8 @@
 Self-hosted vector map tiles with a browser viewer. Download a region once, then
 pan and zoom with no internet connection.
 
+Needs Node 22.13+.
+
 ```
 npm install
 npm run dev
@@ -27,6 +29,7 @@ viewer work with the network unplugged.
 bin/pmtiles                 go-pmtiles CLI (installed on first run)
 data/regions/*.pmtiles      one archive per region
 data/regions.json           registry: bbox, zoom range, build date, size
+data/offline-maps.db        default database: your points of interest
 data/geofabrik-index.json   catalog of 554 named regions
 assets/fonts, assets/sprites  vendored map assets
 apps/backend/               NestJS server + region CLI
@@ -56,6 +59,8 @@ src/assets/     vendored glyphs and sprites; /fonts, /sprites
 src/spa/        catch-all serving the built viewer (imported last, so it
                 never shadows an API route)
 src/places/     name -> boundary lookup; /api/places
+src/pois/       points of interest; /api/pois
+src/db/         TypeORM entities and migrations
 src/jobs/       job registry + SSE stream; /api/jobs
 src/downloads/  the add-a-region pipeline; /api/downloads
 src/setup/      first-run bootstrap; /api/status, /api/setup
@@ -99,6 +104,56 @@ Only one download runs at a time — a second request gets a `409`. Jobs live in
 memory, so restarting the server drops them; any half-written archive is swept
 on the next boot.
 
+## Points of interest
+
+Right-click the map — or long-press on touch — to drop a pin. Give it a name and
+an emoji, either typed (the OS emoji picker works) or taken from the preset row.
+Markers are draggable: let go and the new position is saved.
+
+The sidebar lists the POIs inside the current viewport and shows how many are
+outside it. Clicking one flies to it and opens its editor; **×** deletes it
+behind an inline confirm.
+
+POIs are global, not owned by a region. They are stored in `data/offline-maps.db`
+so deleting or re-downloading the region they sit in leaves them alone, and a
+POI near a border shows up on every region that covers it.
+
+### Storage
+
+POIs go through [TypeORM](https://typeorm.io), so the engine is a configuration
+choice rather than something baked into the queries. The default is a sqlite
+file at `data/offline-maps.db`, which is what a self-hosted install wants and
+which `docker-compose` already persists along with the archives.
+
+To move to Postgres, point `DATABASE_URL` at it and restart — nothing else
+changes, and the migrations run themselves on boot:
+
+```sh
+DATABASE_URL=postgres://maps:secret@localhost:5432/maps npm start
+```
+
+Both drivers ship with the backend (`better-sqlite3`, `pg`). better-sqlite3
+publishes N-API prebuilds, so there is still nothing to compile and the Docker
+image keeps installing with `--ignore-scripts`.
+
+Keeping that promise honest costs a little discipline:
+
+- Entities and migrations are listed explicitly in `src/config/database.ts` —
+  TypeORM's glob loading does not work under ESM.
+- Column types are ones every dialect agrees on. `uuid` becomes a native uuid on
+  Postgres and a `varchar` on sqlite; `@CreateDateColumn` becomes `timestamp`
+  and `datetime`. The migration picks those few spellings off the connection at
+  run time instead of hardcoding SQL.
+- Primary keys are generated with `randomUUID()` in the service, not by a column
+  default — Postgres would need `gen_random_uuid()` and sqlite has no equivalent.
+- `synchronize` is off. Schema changes are migrations, which run on boot.
+
+```sh
+npm run -w @offline-maps/backend migration:show      # what has been applied
+npm run -w @offline-maps/backend migration:run       # apply pending (also automatic on boot)
+npm run -w @offline-maps/backend migration:revert    # undo the last one
+```
+
 ## Running
 
 ```sh
@@ -129,12 +184,20 @@ viewer's origin in `ALLOWED_ORIGINS`, comma-separated. On Linux, create `data/`
 and `assets/` before the first start so they are owned by your user (uid 1000)
 rather than root.
 
+| Variable | Default | |
+|---|---|---|
+| `PORT`, `HOST` | `8080`, `127.0.0.1` | where the server listens |
+| `ALLOWED_ORIGINS` | — | extra origins allowed to call `/api` |
+| `DATABASE_URL` | — | unset uses sqlite in `data/`; set to a `postgres://` url to use Postgres |
+| `DB_LOGGING` | `false` | `true` logs every SQL statement |
+
 ## API
 
 | Route | Purpose |
 |---|---|
 | `GET /api/regions` | Registry of downloaded regions |
-| `GET /api/styles/:region.json` | MapLibre style. `?theme=light\|dark\|white\|grayscale\|black` |
+| `GET /api/styles/_all.json` | MapLibre style with **every** region as its own source. What the viewer loads. `?theme=…` |
+| `GET /api/styles/:region.json` | MapLibre style for one region. `?theme=light\|dark\|white\|grayscale\|black` |
 | `GET /tiles/:region/:z/:x/:y.mvt` | Vector tile |
 | `GET /pmtiles/:region.pmtiles` | Raw archive, with HTTP range support |
 | `GET /fonts/:fontstack/:range.pbf` | Glyphs |
@@ -153,6 +216,10 @@ Region management:
 | `GET /api/jobs/:id/events` | Server-sent progress stream |
 | `DELETE /api/jobs/:id` | Cancel a job, or decline an estimate |
 | `DELETE /api/regions/:name` | Delete an archive and its registry entry |
+| `GET /api/pois` | Points of interest; `?bbox=minLon,minLat,maxLon,maxLat` to limit |
+| `POST /api/pois` | Create one from `{ name, emoji, lat, lon }` |
+| `PATCH /api/pois/:id` | Update any subset of those fields |
+| `DELETE /api/pois/:id` | Delete one |
 
 Map data (`/tiles`, `/pmtiles`, `/fonts`, `/sprites`) is readable from any
 origin so QGIS and the pmtiles CLI keep working. `/api` is not: it answers only

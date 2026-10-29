@@ -11,6 +11,21 @@ export class StylesController {
     private readonly styles: StyleService,
   ) {}
 
+  /**
+   * Combined style: every downloaded region rendered at once.
+   *
+   * Declared before `:file` so Nest's ordered matching picks it first. The
+   * leading underscore cannot collide with a real region — `slugify` strips it.
+   */
+  @Get("_all.json")
+  async all(@Query("theme") theme = "light", @Req() req: Request) {
+    if (!isTheme(theme)) throw new BadRequestException(`unknown theme "${theme}"`);
+    // readAvailable, not readAll: a region whose archive vanished from disk
+    // would otherwise become a source that 404s on every tile.
+    const regions = await this.registry.readAvailable();
+    return this.styles.buildAll(regions, theme, `${req.protocol}://${req.get("host")}`);
+  }
+
   @Get(":file")
   async style(
     @Param("file") file: string,

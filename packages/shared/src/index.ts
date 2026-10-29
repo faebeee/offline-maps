@@ -23,7 +23,10 @@ export type Region = {
   build: string;
   bytes: number;
   addedAt: string;
-  /** boundary used for the extract, drawn as coverage outline in the viewer */
+  /**
+   * Boundary the extract was cut to. Recorded for provenance; the viewer no
+   * longer draws it.
+   */
   polygon?: Polygon;
 };
 
@@ -124,6 +127,54 @@ export type CreateDownloadRequest = {
   /** replace an existing region of the same name */
   force?: boolean;
 };
+
+// --------------------------------------------------------------- pois ---
+
+/**
+ * A user-placed point of interest. POIs live in the sqlite database, are global
+ * rather than owned by a region, and so survive deleting or re-downloading the
+ * region they happen to sit in.
+ */
+export type Poi = {
+  id: string;
+  name: string;
+  /** a single emoji, rendered as the map marker */
+  emoji: string;
+  lat: number;
+  lon: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** `GET /api/pois` (optionally `?bbox=minLon,minLat,maxLon,maxLat`) */
+export type PoisResponse = { pois: Poi[] };
+
+/** `POST /api/pois` */
+export type CreatePoiRequest = { name: string; emoji: string; lat: number; lon: number };
+
+/** `PATCH /api/pois/:id` — every field is optional, omitted ones are untouched. */
+export type UpdatePoiRequest = Partial<CreatePoiRequest>;
+
+/** Quick-pick palette shown next to the emoji input. */
+export const POI_EMOJI_PRESETS = [
+  "📍",
+  "⭐",
+  "🏠",
+  "🍽️",
+  "☕",
+  "🏔️",
+  "🏕️",
+  "⛽",
+  "🚲",
+  "🏖️",
+  "🅿️",
+  "⚓",
+] as const;
+
+export const POI_NAME_MAX = 80;
+/** UTF-16 units, not characters: one emoji with modifiers can be several units. */
+export const POI_EMOJI_MAX = 8;
+export const DEFAULT_POI_EMOJI = "📍";
 
 // ------------------------------------------------------------- status ---
 
