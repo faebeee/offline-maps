@@ -1,0 +1,30 @@
+{
+  "name": "@offline-maps/backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "npm run build --silent && concurrently -k -n tsc,node -c gray,cyan \"tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch --enable-source-maps dist/main.js\"",
+    "start": "node --enable-source-maps dist/main.js",
+    "cli": "npm run build --silent && node --enable-source-maps dist/cli/main.js",
+    "setup": "npm run cli --silent -- setup",
+    "assets:fetch": "npm run cli --silent -- assets:fetch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.3.2",
+    "@nestjs/core": "^12.3.2",
+    "@nestjs/platform-express": "^12.3.2",
+    "@offline-maps/shared": "*",
+    "@protomaps/basemaps": "^5.7.2",
+    "pmtiles": "^4.5.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.10.5",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}
