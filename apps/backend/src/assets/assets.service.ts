@@ -3,7 +3,7 @@ import path from "node:path";
 import { Injectable } from "@nestjs/common";
 import { PATHS } from "../config/paths.ts";
 import { UPSTREAM } from "../config/upstream.ts";
-import { exists } from "../common/files.ts";
+import { exists, moveDir } from "../common/files.ts";
 import { download, run } from "../common/net.ts";
 import { c, formatBytes, log, type Report } from "../common/terminal.ts";
 
@@ -37,9 +37,9 @@ export class AssetsService {
       await fs.rm(PATHS.fonts, { recursive: true, force: true });
       await fs.rm(PATHS.sprites, { recursive: true, force: true });
       await fs.mkdir(PATHS.assets, { recursive: true });
-      await fs.rename(path.join(staging, "fonts"), PATHS.fonts);
+      await moveDir(path.join(staging, "fonts"), PATHS.fonts);
       // Flatten sprites/v4/* to sprites/* — v4 is what @protomaps/basemaps v5 styles use.
-      await fs.rename(path.join(staging, "sprites", "v4"), PATHS.sprites);
+      await moveDir(path.join(staging, "sprites", "v4"), PATHS.sprites);
 
       const stacks = (await fs.readdir(PATHS.fonts, { withFileTypes: true }))
         .filter((e) => e.isDirectory())

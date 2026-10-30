@@ -21,6 +21,21 @@ export async function exists(p: string): Promise<boolean> {
   }
 }
 
+/**
+ * Moves a file or directory, falling back to copy+remove when the source and
+ * destination are on different filesystems/devices (e.g. separate Docker
+ * volumes), where `fs.rename` fails with `EXDEV`.
+ */
+export async function moveDir(src: string, dest: string): Promise<void> {
+  try {
+    await fs.rename(src, dest);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EXDEV") throw err;
+    await fs.cp(src, dest, { recursive: true });
+    await fs.rm(src, { recursive: true, force: true });
+  }
+}
+
 /** `fs.stat`, but undefined instead of throwing when the file is not there. */
 export async function statFile(file: string): Promise<{ size: number; mtimeMs: number } | undefined> {
   try {
